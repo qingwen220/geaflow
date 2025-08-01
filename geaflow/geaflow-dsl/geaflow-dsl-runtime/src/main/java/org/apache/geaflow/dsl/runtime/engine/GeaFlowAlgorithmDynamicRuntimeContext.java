@@ -40,6 +40,11 @@ import org.apache.geaflow.model.graph.edge.IEdge;
 import org.apache.geaflow.model.graph.vertex.IVertex;
 import org.apache.geaflow.model.traversal.ITraversalResponse;
 import org.apache.geaflow.model.traversal.TraversalType.ResponseType;
+import org.apache.geaflow.state.iterator.IteratorWithClose;
+import org.apache.geaflow.state.pushdown.filter.EmptyFilter;
+import org.apache.geaflow.state.pushdown.filter.IFilter;
+import org.apache.geaflow.state.pushdown.filter.InEdgeFilter;
+import org.apache.geaflow.state.pushdown.filter.OutEdgeFilter;
 
 public class GeaFlowAlgorithmDynamicRuntimeContext implements AlgorithmRuntimeContext<Object, Object> {
 
@@ -59,15 +64,12 @@ public class GeaFlowAlgorithmDynamicRuntimeContext implements AlgorithmRuntimeCo
 
     private long iterationId = -1L;
 
-    public GeaFlowAlgorithmDynamicRuntimeContext(
-        GeaFlowAlgorithmDynamicAggTraversalFunction traversalFunction,
-        IncVertexCentricTraversalFuncContext<Object, Row, Row, Object, Row> traversalContext,
-        GraphSchema graphSchema) {
+    public GeaFlowAlgorithmDynamicRuntimeContext(GeaFlowAlgorithmDynamicAggTraversalFunction traversalFunction,
+                                                 IncVertexCentricTraversalFuncContext<Object, Row, Row, Object, Row> traversalContext, GraphSchema graphSchema) {
         this.traversalFunction = traversalFunction;
         this.incVCTraversalCtx = traversalContext;
         this.graphSchema = graphSchema;
-        TraversalGraphSnapShot<Object, Row, Row> graphSnapShot = incVCTraversalCtx.getHistoricalGraph()
-            .getSnapShot(0L);
+        TraversalGraphSnapShot<Object, Row, Row> graphSnapShot = incVCTraversalCtx.getHistoricalGraph().getSnapShot(0L);
         this.vertexQuery = graphSnapShot.vertex();
         this.edgeQuery = graphSnapShot.edges();
     }
@@ -109,6 +111,25 @@ public class GeaFlowAlgorithmDynamicRuntimeContext implements AlgorithmRuntimeCo
         }
     }
 
+    @Override
+    public CloseableIterator<RowEdge> loadEdgesIterator(EdgeDirection direction) {
+        switch (direction) {
+            case OUT:
+                return loadEdgesIterator(OutEdgeFilter.getInstance());
+            case IN:
+                return loadEdgesIterator(InEdgeFilter.getInstance());
+            case BOTH:
+                return loadEdgesIterator(EmptyFilter.getInstance());
+            default:
+                throw new GeaFlowDSLException("Illegal edge direction: " + direction);
+        }
+    }
+
+    @Override
+    public CloseableIterator<RowEdge> loadEdgesIterator(IFilter filter) {
+        return (CloseableIterator) edgeQuery.getEdges(filter);
+    }
+
     public List<RowEdge> loadDynamicEdges(EdgeDirection direction) {
         List<IEdge<Object, Row>> edges = incVCTraversalCtx.getTemporaryGraph().getEdges();
         List<RowEdge> rowEdges = new ArrayList<>();
@@ -142,45 +163,61 @@ public class GeaFlowAlgorithmDynamicRuntimeContext implements AlgorithmRuntimeCo
     }
 
     public List<RowEdge> loadStaticEdges(EdgeDirection direction) {
-        List<IEdge<Object, Row>> edges;
         switch (direction) {
             case OUT:
-                edges = this.incVCTraversalCtx.getHistoricalGraph()
-                    .getSnapShot(0).edges().getOutEdges();
-                break;
+                return (List) edgeQuery.getOutEdges();
             case IN:
-                edges = this.incVCTraversalCtx.getHistoricalGraph()
-                    .getSnapShot(0).edges().getInEdges();
-                break;
+                return (List) edgeQuery.getInEdges();
             case BOTH:
-                edges = this.incVCTraversalCtx.getHistoricalGraph()
-                    .getSnapShot(0).edges().getEdges();
-                break;
+                return (List) edgeQuery.getEdges();
             default:
                 throw new GeaFlowDSLException("Illegal edge direction: " + direction);
         }
-        List<RowEdge> rowEdges = new ArrayList<>();
-        if (edges == null) {
-            return rowEdges;
-        }
-        for (IEdge<Object, Row> edge : edges) {
-            rowEdges.add((RowEdge) edge);
-        }
-        return rowEdges;
     }
 
     @Override
     public CloseableIterator<RowEdge> loadStaticEdgesIterator(EdgeDirection direction) {
         switch (direction) {
             case OUT:
-                return (CloseableIterator) edgeQuery.getOutEdgesIterator();
+                return loadStaticEdgesIterator(OutEdgeFilter.getInstance());
             case IN:
-                return (CloseableIterator) edgeQuery.getInEdgesIterator();
+                return loadStaticEdgesIterator(InEdgeFilter.getInstance());
             case BOTH:
-                return (CloseableIterator) edgeQuery.getEdgesIterator();
+                return loadStaticEdgesIterator(EmptyFilter.getInstance());
             default:
                 throw new GeaFlowDSLException("Illegal edge direction: " + direction);
         }
+    }
+
+    @Override
+    public CloseableIterator<RowEdge> loadStaticEdgesIterator(IFilter filter) {
+        return (CloseableIterator) edgeQuery.getEdges(filter);
+    }
+
+    @Override
+    public CloseableIterator<RowEdge> loadDynamicEdgesIterator(EdgeDirection direction) {
+        switch (direction) {
+            case OUT:
+                return loadDynamicEdgesIterator(OutEdgeFilter.getInstance());
+            case IN:
+                return loadDynamicEdgesIterator(InEdgeFilter.getInstance());
+            case BOTH:
+                return loadDynamicEdgesIterator(EmptyFilter.getInstance());
+            default:
+                throw new GeaFlowDSLException("Illegal edge direction: " + direction);
+        }
+    }
+
+    @Override
+    public CloseableIterator<RowEdge> loadDynamicEdgesIterator(IFilter filter) {
+        List<IEdge<Object, Row>> edges = incVCTraversalCtx.getTemporaryGraph().getEdges();
+        List<RowEdge> res = new ArrayList<>();
+        for (IEdge<Object, Row> edge : edges) {
+            if (filter.filter(edge)) {
+                res.add((RowEdge) edge);
+            }
+        }
+        return IteratorWithClose.wrap(res.iterator());
     }
 
     @Override

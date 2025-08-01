@@ -26,6 +26,7 @@ import org.apache.geaflow.api.graph.function.aggregate.VertexCentricAggContextFu
 import org.apache.geaflow.api.graph.function.vc.VertexCentricTraversalFunction.TraversalEdgeQuery;
 import org.apache.geaflow.api.graph.function.vc.VertexCentricTraversalFunction.VertexCentricTraversalFuncContext;
 import org.apache.geaflow.common.config.Configuration;
+import org.apache.geaflow.common.exception.GeaflowRuntimeException;
 import org.apache.geaflow.common.iterator.CloseableIterator;
 import org.apache.geaflow.dsl.common.algo.AlgorithmRuntimeContext;
 import org.apache.geaflow.dsl.common.data.Row;
@@ -36,6 +37,10 @@ import org.apache.geaflow.dsl.runtime.traversal.message.ITraversalAgg;
 import org.apache.geaflow.model.graph.edge.EdgeDirection;
 import org.apache.geaflow.model.traversal.ITraversalResponse;
 import org.apache.geaflow.model.traversal.TraversalType.ResponseType;
+import org.apache.geaflow.state.pushdown.filter.EmptyFilter;
+import org.apache.geaflow.state.pushdown.filter.IFilter;
+import org.apache.geaflow.state.pushdown.filter.InEdgeFilter;
+import org.apache.geaflow.state.pushdown.filter.OutEdgeFilter;
 
 public class GeaFlowAlgorithmRuntimeContext implements AlgorithmRuntimeContext<Object, Object> {
 
@@ -85,27 +90,61 @@ public class GeaFlowAlgorithmRuntimeContext implements AlgorithmRuntimeContext<O
     }
 
     @Override
-    public List<RowEdge> loadStaticEdges(EdgeDirection direction) {
-        throw new RuntimeException("GeaFlowAlgorithmRuntimeContext not support loadStaticEdges");
+    public CloseableIterator<RowEdge> loadEdgesIterator(EdgeDirection direction) {
+        switch (direction) {
+            case OUT:
+                return loadEdgesIterator(OutEdgeFilter.getInstance());
+            case IN:
+                return loadEdgesIterator(InEdgeFilter.getInstance());
+            case BOTH:
+                return loadEdgesIterator(EmptyFilter.getInstance());
+            default:
+                throw new GeaFlowDSLException("Illegal edge direction: " + direction);
+        }
     }
 
     @Override
-    public List<RowEdge> loadDynamicEdges(EdgeDirection direction) {
-        throw new RuntimeException("GeaFlowAlgorithmRuntimeContext not support loadDynamicEdges");
+    public CloseableIterator<RowEdge> loadEdgesIterator(IFilter filter) {
+        return (CloseableIterator) edgeQuery.getEdges(filter);
+    }
+
+    @Override
+    public List<RowEdge> loadStaticEdges(EdgeDirection direction) {
+        return loadEdges(direction);
     }
 
     @Override
     public CloseableIterator<RowEdge> loadStaticEdgesIterator(EdgeDirection direction) {
         switch (direction) {
             case OUT:
-                return (CloseableIterator) edgeQuery.getOutEdgesIterator();
+                return loadStaticEdgesIterator(OutEdgeFilter.getInstance());
             case IN:
-                return (CloseableIterator) edgeQuery.getInEdgesIterator();
+                return loadStaticEdgesIterator(InEdgeFilter.getInstance());
             case BOTH:
-                return (CloseableIterator) edgeQuery.getEdgesIterator();
+                return loadStaticEdgesIterator(EmptyFilter.getInstance());
             default:
                 throw new GeaFlowDSLException("Illegal edge direction: " + direction);
         }
+    }
+
+    @Override
+    public CloseableIterator<RowEdge> loadStaticEdgesIterator(IFilter filter) {
+        return (CloseableIterator) edgeQuery.getEdges(filter);
+    }
+
+    @Override
+    public List<RowEdge> loadDynamicEdges(EdgeDirection direction) {
+        throw new GeaflowRuntimeException("GeaFlowAlgorithmRuntimeContext not support loadDynamicEdges");
+    }
+
+    @Override
+    public CloseableIterator<RowEdge> loadDynamicEdgesIterator(EdgeDirection direction) {
+        throw new GeaflowRuntimeException("GeaFlowAlgorithmRuntimeContext not support loadDynamicEdgesIterator");
+    }
+
+    @Override
+    public CloseableIterator<RowEdge> loadDynamicEdgesIterator(IFilter filter) {
+        throw new GeaflowRuntimeException("GeaFlowAlgorithmRuntimeContext not support loadDynamicEdgesIterator");
     }
 
     @Override

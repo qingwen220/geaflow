@@ -65,22 +65,23 @@ public class StepPlanTest {
                 .withOutputType(VoidType.INSTANCE)
                 .withGraphSchema(createGraph())
                 .vertexMatch(new MatchVertexFunctionImpl(Sets.newHashSet(BinaryString.fromString(
-                    "person")), "a", EmptyFilter.of()))
-                .withInputPathSchema(PathType.EMPTY)
-                .withOutputPathSchema(PathType.EMPTY)
-                .withOutputType(VoidType.INSTANCE)
-                .withGraphSchema(createGraph())
+                    "person")), "a", EmptyFilter.getInstance()))
+                    .withInputPathSchema(PathType.EMPTY)
+                    .withOutputPathSchema(PathType.EMPTY)
+                    .withOutputType(VoidType.INSTANCE)
+                    .withGraphSchema(createGraph())
                 .edgeMatch(new MatchEdgeFunctionImpl(EdgeDirection.OUT, Sets.newHashSet(), "e"))
                 .withInputPathSchema(PathType.EMPTY)
                 .withOutputPathSchema(PathType.EMPTY)
                 .withOutputType(VoidType.INSTANCE)
                 .withGraphSchema(createGraph())
                 .vertexMatch(new MatchVertexFunctionImpl(Sets.newHashSet(BinaryString.fromString(
-                    "person")), "b", EmptyFilter.of()))
-                .withInputPathSchema(PathType.EMPTY)
-                .withOutputPathSchema(PathType.EMPTY)
-                .withOutputType(VoidType.INSTANCE)
-                .withGraphSchema(createGraph());
+                    "person")), "b", EmptyFilter.getInstance()))
+                    .withInputPathSchema(PathType.EMPTY)
+                    .withOutputPathSchema(PathType.EMPTY)
+                    .withOutputType(VoidType.INSTANCE)
+                    .withGraphSchema(createGraph())
+            ;
         String planDesc = logicalPlan.getPlanDesc();
         LOGGER.info("Logical plan:\n{}", planDesc);
         Assert.assertEquals(planDesc,
